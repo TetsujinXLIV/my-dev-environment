@@ -6,7 +6,7 @@ local config = wezterm.config_builder()
 
 -- This is where you actually apply your config choices
 
-color_scheme = "Catppuccin Macchiato"
+config.color_scheme = "Catppuccin Macchiato"
 
 -- Windows font: FiraMono Nerd Font Mono
 -- Mac font: FiraCode Nerd Font Mono

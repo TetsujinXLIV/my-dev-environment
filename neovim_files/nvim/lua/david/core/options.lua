@@ -50,7 +50,10 @@ opt.backspace = "indent,eol,start"
 
 -- clipboard
 -- use system clipboard as default register
-opt.clipboard:append("unnamedplus")
+-- opt.clipboard:append("unnamedplus")
+-- the above doesn't work at least on Mac to copy to system clipboard
+-- but this does
+opt.clipboard = "unnamedplus"
 
 -- split windows
 -- split vertical window to the right
