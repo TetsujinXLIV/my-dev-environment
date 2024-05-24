@@ -1,0 +1,271 @@
+#!/bin/bash
+
+# Script Information
+VERSION_S="1.1.0"
+
+# ANSI Escape Codes for Colors
+BOLD='\e[1m'
+BLACK='\e[30m'
+RED='\e[31m'
+GREEN='\e[32m'
+YELLOW='\e[33m'
+BLUE='\e[34m'
+MAGENTA='\e[35m'
+CYAN="\e[36m"
+WHITE='\e[37m'
+GRAY='\e[90m'
+RESET='\e[0m'
+
+## Bold Colors
+B_BLACK=${BOLD}${BLACK}
+B_RED=${BOLD}${RED}
+B_GREEN=${BOLD}${GREEN}
+B_YELLOW=${BOLD}${YELLOW}
+B_BLUE=${BOLD}${BLUE}
+B_MAGENTA=${BOLD}${MAGENTA}
+B_CYAN=${BOLD}${CYAN}
+B_GRAY=${BOLD}${GRAY}
+B_WHITE=${BOLD}${WHITE}
+
+# Function to Display Help Text
+function show_help() {
+    echo "Usage: ${0##*/} [-h] [-v]"
+    echo ""
+    echo "Options:"
+    echo "  -h          Display this help message"
+    echo "  -v          Display script version"
+    echo "  -i          Display installation instructions"
+    echo ""
+}
+
+# Function to Display Version Information
+function show_version() {
+    echo "Version: $VERSION_S"
+    echo "2024-05-18: Adding support for Raspberry Pi"
+    echo "2024-05-18: Added support for Tmux and Neovim versions"
+    echo "2024-05-18: Adding installation instructions"
+}
+
+# Function to Display Version Information
+function show_installation() {
+    echo -e "${YELLOW}How to install:${RESET}"
+    echo -e "${CYAN}sudo cp morenofetch /usr/bin${RESET}"
+    echo -e "${CYAN}sudo chmod +x /usr/bin/morenofetch${RESET}"
+    echo -e "${CYAN}nvim/vim/nano ~/.bashrc${RESET}"
+    echo -e "${YELLOW}Add the following lines at the end:${RESET}"
+    echo -e "${CYAN}# Check if not in a tmux session${RESET}"
+    echo -e "${CYAN}if [[ -z "$TMUX" ]]; then${RESET}"
+    echo -e "${CYAN}    # Run your custom script here (replace 'script_name.sh' with the actual filename)${RESET}"
+    echo -e "${CYAN}    morenofetch${RESET}"
+    echo -e "${CYAN}fi${RESET}"
+    echo -e "${YELLOW}Save and exit${RESET}"
+    echo -e "${CYAN}source ~/.bashrc${RESET}"
+}
+
+# Get System Information
+
+# OS/Environment Info Detection
+ostype="$(uname)"
+
+if [[ "$ostype" == "Linux" ]]; then
+    user=$(whoami)  
+    host=$(cat /proc/sys/kernel/hostname)
+		
+		# Linux-Specific Info
+    . /etc/os-release 
+    os="${PRETTY_NAME}"
+    kernel="$(uname -r)"
+
+    IFS=. read -r s _ < /proc/uptime 
+    d="$((s / 60 / 60 / 24))"
+    h="$((s / 60 / 60 % 24))"
+    m="$((s / 60 % 60))"
+
+    [ "$d" -gt 1 ] && dp=s
+    [ "$h" -gt 1 ] && hp=s
+    [ "$m" -gt 1 ] && mp=s
+
+    [ "$d" = 0 ] && d=
+    [ "$h" = 0 ] && h=
+    [ "$m" = 0 ] && m=
+    [ "$m" != "" ] && s=
+
+    [ "$d" ] && uptime="$d day$dp, "
+    [ "$h" ] && uptime="$uptime$h hour$hp, "
+    [ "$m" ] && uptime="$uptime$m min$mp"
+
+    uptime=${uptime%, } 
+		# Shell Detection
+		current_shell=$(basename "$SHELL")
+		# Get root partition usage
+		disk_usage=$(df -h --output=used,size / | awk 'NR==2 {print $1 "/" $2}')
+		# Get local IP
+		ip_address=$(hostname -I | awk '{print $1}')
+		# Get first MAC address
+    mac_address=$(ip link show | awk '/ether/ {print $2}' | head -n 1)
+else
+    user="N/A"
+    host="N/A"
+		os="N/A"
+    kernel="N/A"
+    uptime="N/A"
+		current_shell="N/A"
+		load_avg="N/A"
+		disk_usage="N/A"
+		ip_address="N/A"
+    mac_address="N/A"
+fi
+
+## CPU DETECTION
+case $ostype in
+    *"Linux"*)
+        if [[ "$(uname -m)" =~ ^(arm|aarch) ]]; then  # Check if machine architecture starts with 'arm' or 'aarch'
+            # ARM-specific CPU detection (if needed)
+            cpu_info=$(awk '/^Model/ {print $3,$4,$5,$6,$7; exit}' /proc/cpuinfo)
+        else
+            # Other CPU detection
+            cpu_info=$(awk -F':' '/^model name/ {print $2; exit}' /proc/cpuinfo | sed -e 's/^[ \t]*//')
+        fi
+        ;;
+    *"Darwin"*)
+        cpu_info=$(sysctl -n machdep.cpu.brand_string)
+        ;; 
+    *"BSD"*)
+        # Add BSD-specific CPU detection here
+        cpu_info="Unable to determine"
+        ;;
+    *)
+        cpu_info="Unable to determine"
+        ;;
+esac
+
+## GPU DETECTION
+gpu_cmd="$(lspci -mm | awk -F '\"|\" \"|\\(' '/"Display|"3D|"VGA/ {a[$0] = $1 " " $3 " " $4} END {for(i in a) {if(!seen[a[i]]++) print a[i]}}')"
+IFS=$'\n' read -d "" -ra gpus <<< "$gpu_cmd"
+
+# Simple Brand/Model Formatting (Adjust as needed)
+for gpu in "${gpus[@]}"; do
+	case $gpu in
+		*"NVIDIA"*)  gpu="NVIDIA ${gpu/*\[/*\]}"
+			brand="NVIDIA";;
+		*"AMD"*) gpu="${gpu/*\[AMD\/ATI\] /}"; gpu="${gpu/*\[AMD\] /}"
+			brand="AMD";;
+		*"Intel"*) gpu="Intel ${gpu/*Intel/}"
+			brand="Intel";;
+		# Add more as needed...
+	esac
+	gpu_model=$(echo $gpu | sed 's/\[.*$//')
+	gpu_model=$(echo $gpu_model | sed -E 's/^[0-9a-zA-Z]{2}:[0-9a-zA-Z]{2}\.[0-9a-zA-Z]//')
+	gpu_model=$(echo $gpu_model | sed 's/^[ \t]*//') 
+	gpu_info="${brand} ${gpu_info}${gpu_model} / " # Build output string
+done
+# Check if ending in " / "
+if [[ "$gpu_info" == *" / " ]]; then
+    # Remove trailing ' / '
+		gpu_info="${gpu_info::-2}"
+fi
+gpu_info=$(echo $gpu_info | sed 's/^[ \t]*//')
+
+## RAM DETECTION
+
+case $ostype in
+	*"Linux"*)
+		while IFS=':k '  read -r key val _; do
+			case $key in
+				MemTotal)
+					mem_used=$((mem_used + val))
+					mem_full=$val;;
+				Shmem) mem_used=$((mem_used + val));;
+				MemFree|Buffers|Cached|SReclaimable) mem_used=$((mem_used - val));;
+			esac
+		done < /proc/meminfo
+		mem_used=$((mem_used / 1024)) 
+		mem_full=$((mem_full / 1024));;
+	*"Darwin"*)
+		mem_full=$(($(sysctl -n hw.memsize) / 1024 / 1024))
+		while IFS=:. read -r key val; do
+			case $key in
+				*' wired'*|*' active'*|*' occupied'*)
+					mem_used=$((mem_used + ${val:-0}));;
+			esac
+			done <<-EOF
+				$(vm_stat)
+						EOF
+
+			mem_used=$((mem_used * 4 / 1024));;
+	*"BSD"*)
+		mem_full=$(($(sysctl -n hw.physmem) / 1024 / 1024))
+		if [ $distrotype = netbsd ]; then
+			mem_free=$(($(vmstat | awk 'NR==3 {print $4}') / 1024))
+		else
+			mem_free=$(($(sysctl -n vm.stats.vm.v_free_count) * $(sysctl -n vm.stats.vm.v_page_size) / 1024 / 1024))
+		fi
+		mem_used=$((mem_full - mem_free));;
+	*)
+		mem_full=1
+		mem_used=0;;
+esac
+memstat="${mem_used}/${mem_full} MiB"
+if which expr > /dev/null 2>&1; then
+	mempercent="($(expr $(expr ${mem_used} \* 100 / ${mem_full} ))%)"
+fi
+
+# TMUX and Neovim Version Detection
+tmux_version=$(tmux -V 2>/dev/null | awk '{print $2}')  # Get tmux version
+if [[ -z "$tmux_version" ]]; then
+    tmux_version="Not Installed"
+fi
+
+nvim_version=$(nvim --version | head -n 1 | awk '{print $2}')  # Get neovim version
+if [[ -z "$nvim_version" ]]; then
+    nvim_version="Not Installed"
+fi
+
+# Function to Display Welcome Message
+function welcome_message() {
+    echo -e "${CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⣴⣶⣾⣿⣿⣿⣿⣷⣶⣦⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀    ${RED}${user}${YELLOW}@${BLUE}${host}"
+		echo -e "${CYAN}⠀⠀⠀⠀⠀⣠⣴⣿⠿⢛⣩⣥⣶⠶⠶⠶⠶⣶⣬⣍⡛⠿⣿⣦⣄         --------------------------------------------------"
+		echo -e "${CYAN}⠀⠀⠀⣠⣾⡿⢋⣥⠞⠋⠈⣿⣿⠀⠀⠀⠀⣿⣿⠉⠙⠳⣬⡛⢿⣷⣄       ${RED}OS${YELLOW}: ${GREEN}${os}"
+		echo -e "${CYAN}⠀⠀⣴⣿⠏⣴⠋⠀⠀⠀⠀⣿⣿⡆⠀⠀⢸⣿⣿⠀⠀⠀⠀⢹⣦⠻⣿⣦      ${RED}Kernel${YELLOW}: ${GREEN}${kernel}"
+		echo -e "${CYAN}⠀⣼⣿⢃⣾⣿⣏⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⣹⣿⣷⡘⣿⣧     ${RED}Uptime${YELLOW}: ${GREEN}${uptime}"
+		echo -e "${CYAN}⢰⣿⠇⡾⠻⡅⠉⠛⢦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⡴⠛⠉⢨⠟⣧⢸⣿⡆    ${RED}Shell${YELLOW}: ${GREEN}${current_shell}"
+		echo -e "${CYAN}⣾⣿⢸⡇⠀⠹⣄⠀⠀⠈⢻⣿⡿⢿⣿⣿⡿⢿⣿⡟⠁⠀⠀⣰⠋⠀⢸⡆⣿⣷    ${RED}Tmux${YELLOW}: ${GREEN}${tmux_version}"
+		echo -e "${CYAN}⣿⣿⢸⡇⠀⠀⣘⣆⠀⠀⠀⠻⣷⣦⠀⠀⣴⣾⠏⠀⠀⠀⣰⣃⠀⠀⢸⡇⣿⣿    ${RED}Neovim${YELLOW}: ${GREEN}${nvim_version}"
+		echo -e "${CYAN}⢿⣿⢸⣷⣾⣿⡿⠟⢦⠀⠀⠀⠹⣿⣇⣸⣿⠏⠀⠀⠀⡼⠻⢿⣿⣷⣾⠇⣿⡟    ${RED}Network${YELLOW}: ${GREEN}${ip_address} ${YELLOW}: ${GREEN}${mac_address}"
+		echo -e "${CYAN}⠸⣿⡆⢿⡉⠁⠀⠀⠈⢧⠀⠀⠀⠙⣿⣿⠃⠀⠀⢀⡜⠁⠀⠀⠈⢙⡟⣸⣿⠇    ${RED}CPU${YELLOW}: ${GREEN}${cpu_info}"
+		echo -e "${CYAN}⠀⢻⣿⡌⢷⡀⠀⣠⣴⣿⣷⡀⠀⠀⢸⡇⠀⠀⢀⣾⣿⣦⣄⠀⢀⡾⣡⣿⡟     ${RED}GPU${YELLOW}: ${GREEN}${gpu_info}"
+		echo -e "${CYAN}⠀⠀⠻⣿⣦⠻⣿⣿⠿⠋⠀⠳⡄⠀⢸⡇⠀⢠⠎⠀⠙⢿⣿⣿⢟⣴⣿⠟      ${RED}RAM${YELLOW}: ${GREEN}${RAM}${memstat} ${mempercent}"
+		echo -e "${CYAN}⠀⠀⠀⠙⢿⣷⣬⡛⢦⣄⡀⠀⠹⣄⣸⣇⣠⠏⠀⢀⣠⡴⢛⣵⣾⡿⠃       ${RED}DISK${YELLOW}: ${GREEN}${disk_usage}"
+		echo -e "${CYAN}⠀⠀⠀⠀⠀⠉⠻⣿⣶⣬⣉⣛⠲⠿⠿⠿⠿⠖⣛⣩⣥⣾⣿⠟⠉         ${BLACK}███${RED}███${GREEN}███${YELLOW}███${BLUE}███${MAGENTA}███${CYAN}███${WHITE}███"
+		echo -e "${CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠻⠿⠿⣿⣿⣿⣿⠿⠿⠟⠛⠉            ${B_BLACK}███${B_RED}███${B_GREEN}███${B_YELLOW}███${B_BLUE}███${B_MAGENTA}███${B_CYAN}███${B_WHITE}███"
+		echo ""
+		echo -e "${CYAN} #     # ####### #        #####  ####### #     # ####### "
+		echo -e "${CYAN} #  #  # #       #       #     # #     # ##   ## #       "
+		echo -e "${CYAN} #  #  # #       #       #       #     # # # # # #       "
+		echo -e "${CYAN} #  #  # #####   #       #       #     # #  #  # #####   "
+		echo -e "${CYAN} #  #  # #       #       #       #     # #     # #       "
+		echo -e "${CYAN} #  #  # #       #       #     # #     # #     # #       "
+		echo -e "${CYAN}  ## ##  ####### #######  #####  ####### #     # ####### "	
+		echo ""
+		echo -e "${CYAN} #     # ######         #     # ####### ######  ####### #     # ####### "
+		echo -e "${CYAN} ##   ## #     #        ##   ## #     # #     # #       ##    # #     # "
+		echo -e "${CYAN} # # # # #     #        # # # # #     # #     # #       # #   # #     #"
+		echo -e "${CYAN} #  #  # ######         #  #  # #     # ######  #####   #  #  # #     # "
+		echo -e "${CYAN} #     # #   #   ###    #     # #     # #   #   #       #   # # #     # "
+		echo -e "${CYAN} #     # #    #  ###    #     # #     # #    #  #       #    ## #     # "
+		echo -e "${CYAN} #     # #     # ###    #     # ####### #     # ####### #     # ####### ${RESET}"
+}
+
+# Handle Command-Line Arguments
+while getopts ":hvi" opt; do
+    case ${opt} in
+        h ) show_help; exit 0 ;;
+        v ) show_version; exit 0 ;;
+        i ) show_installation; exit 0 ;;
+        \? ) echo "Invalid option: -${OPTARG}"; show_help; exit 1 ;;
+        :  ) echo "Option -${OPTARG} requires an argument."; show_help; exit 1 ;;
+    esac
+done
+
+# Display Welcome Message if no arguments
+welcome_message
