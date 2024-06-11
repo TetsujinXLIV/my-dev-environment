@@ -8,3 +8,4 @@ Repo for easy setup of preferred development environment
 - Alacritty (Not Used Anymore)
 - VSCode
 - Custom Entry Message
+- Python with venv and pyenv
