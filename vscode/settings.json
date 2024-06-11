@@ -1,0 +1,46 @@
+{
+    "workbench.iconTheme": "catppuccin-macchiato",
+    "editor.fontFamily": "'DejaVu Sans Mono for Powerline', fira-code-nerd, FiraCode Nerd Font, Consolas, 'Courier New', monospace",
+    "editor.fontLigatures": true,
+    "terminal.integrated.fontFamily": "'Hack NF', 'Fira Code Nerd Font'",
+    "workbench.colorTheme": "Catppuccin Macchiato",
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.completeFunctionParens": true,
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "black-formatter.path": ["/home/david/venv/bin/pyink"],
+    "black-formatter.args": [
+        "--line-length=120",
+        "--preview",
+        "--pyink-indentation=2",
+        "--pyink-use-majority-quotes"
+    ],
+    "editor.formatOnSave": true,
+    "editor.rulers": [
+        120
+    ],
+    "settingsSync.ignoredSettings": [
+        "remote.SSH.configFile",
+        "black-formatter.path"
+    ],
+    "pylint.args": [
+        "--max-line-length=120", 
+        "--indent-string=\"  \"", 
+        "--disable=too-many-statements", 
+        "--disable=too-many-locals",
+        "--disable=too-many-branches"
+    ],
+    "editor.tabSize": 2,
+    "remote.SSH.remotePlatform": {},
+    "editor.inlineSuggest.suppressSuggestions": true,
+    "security.workspace.trust.untrustedFiles": "open",
+    "workbench.startupEditor": "none",
+    "remote.tunnels.alwaysUpdateCLI": true,
+    "remote.SSH.configFile": "/home/david/.ssh/config",
+    "editor.minimap.enabled": false,
+    "json.schemas": [],
+    "cloudcode.duetAI.project": "mk-gemini",
+    "cloudcode.project": "mk-gemini",
+    "extensions.experimental.affinity": {
+        "asvetliakov.vscode-neovim": 1
+    }
+}
